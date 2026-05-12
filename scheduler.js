@@ -668,8 +668,7 @@ function updateRoles(...roleElems) {
             const task = dbGetTask(id);
             return (!period || task?.period === period) && (task?.roles?.[role.type] === roleId) ? task.value : 0;
         }));
-        const usedPercent = totalValue <= 0 ? 0 : Math.round(100 * usedValue / totalValue);
-        usedSliderElem.style.width = (usedPercent / 2) + "%";
+        usedSliderElem.style.width = usedValueSliderWidth(usedValue, totalValue) + "%";
         usedValueElem.textContent = displaySign(Math.round(usedValue - totalValue));
         const sizeElem = roleElem.elements["size"];
         if (sizeElem) {
@@ -733,6 +732,7 @@ function showSummary(event) {
     content.appendChild(newElem("h2", `${role.name} (${size}${postSize}${calculateValue(role)})`));
     if (role.comments?.trim()) content.appendChild(newElem("p")).innerHTML = role.comments.trim().replace("\n", "<br>");
     const totalTarget = sum(Object.values(role.target));
+    content.appendChild(newElem("h3", "Total for all periods"));
     content.appendChild(newElem("ul")).appendChild(newElem("li", `${totalValue}${postValue} (out of ${totalTarget}${postValue})`));
     for (const key of Object.keys(roleTasks).toSorted()) {
         const valueSum = sum(roleTasks[key].map((task) => task.value));
@@ -892,6 +892,11 @@ function widthToValue(width) {
 function snapToGrid(value) {
     const v2w = SETTINGS.valueToWidth;
     return Math.round(value / v2w.snapDelta) * v2w.snapDelta;
+}
+
+function usedValueSliderWidth(usedValue, totalValue) {
+    const usedPercent = 50 * (1 + Math.tanh(2 * (usedValue - totalValue) / totalValue));
+    return Math.max(0, Math.min(100, usedPercent));
 }
 
 

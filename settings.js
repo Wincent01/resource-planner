@@ -22,7 +22,7 @@ var SETTINGS = {
         factor: 2,
         exponent: 0.75,
         minValue: 10,
-        snapDelta: 10,
+        snapDelta: 5,
     },
     sizeDescriptor: {
         person: "%",
