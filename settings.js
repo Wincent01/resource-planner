@@ -1,6 +1,6 @@
 
 var SETTINGS = {
-    fileName: "schedule.json",
+    exportFileName: "schedule",
     unknownPeriodName: "Unnamed period",
     newRoleValue: {
         faculty: 850,

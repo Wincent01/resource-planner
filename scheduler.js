@@ -170,27 +170,30 @@ function clonePeriod(fromPeriod, toPeriod) {
 // Import, export
 
 function setupImportExport() {
-    const importElem = document.querySelector('#import-data input[type="file"]');
-    importElem.addEventListener("change", importData);
-    document.querySelector("#import-data button").addEventListener("click", () => importElem.click());
-    const exportElem = document.querySelector("#export-data button");
-    exportElem.addEventListener("click", exportData);
-    exportElem.value = `Export data to "${SETTINGS.fileName}"`
+    const importJSONElem = document.querySelector('#import-json input[type="file"]');
+    importJSONElem.addEventListener("change", importJSON);
+    document.querySelector("#import-json button").addEventListener("click", () => importJSONElem.click());
+    const exportJSONElem = document.querySelector("#export-json button");
+    exportJSONElem.addEventListener("click", exportJSON);
+    exportJSONElem.value = `Export data to "${SETTINGS.exportFileName}.json"`
+    const exportCSVElem = document.querySelector("#export-csv button");
+    exportCSVElem.addEventListener("click", exportCSV);
+    exportCSVElem.value = `Export data to "${SETTINGS.exportFileName}.csv"`
 }
 
 
-function exportData() {
+function exportJSON() {
     const text = JSON.stringify(dbGetAllData(), null, 4);
     const href = "data:text/plain;charset=utf-8," + encodeURIComponent(text);
-    let elem = newElem("a", {href: href, download: SETTINGS.fileName, style: "display:none"});
+    let elem = newElem("a", {href: href, download: SETTINGS.exportFileName+".json", style: "display:none"});
     document.body.appendChild(elem);
     elem.click();
     document.body.removeChild(elem);
 }
 
 
-function importData() {
-    const fileInput = document.querySelector("#import-data input");
+function importJSON() {
+    const fileInput = document.querySelector("#import-json input");
     const fileReader = new FileReader();
     fileReader.onload = (e) => {
         const content = e.target.result;
@@ -198,6 +201,31 @@ function importData() {
         window.location.reload();
     };
     fileReader.readAsText(fileInput.files[0]);
+}
+
+
+function exportCSV() {
+    const taskIds = dbTaskIds();
+    const someTask = dbGetTask(taskIds[0]);
+    const roleNames = Object.keys(someTask.roles).toSorted();
+    const header = roleNames.flatMap(
+        (n) => [n, n + " name", n + " nickname", n + " group", n + " size"]
+    ).concat("period", "value");
+    function makeRow(task) {
+        return roleNames.flatMap((n) => {
+            const r = dbGetRole(task.roles[n]);
+            return [task.roles[n], r.name, r.nickname || r.name, r.group, r?.size?.[task.period] || 0];
+        }).concat(task.period, task.value);
+    }
+    let text = header.join(";") + "\n";
+    for (const id of dbTaskIds()) {
+        text += makeRow(dbGetTask(id)).join(";") + "\n";
+    }
+    const href = "data:text/plain;charset=utf-8," + encodeURIComponent(text);
+    let elem = newElem("a", {href: href, download: SETTINGS.exportFileName+".csv", style: "display:none"});
+    document.body.appendChild(elem);
+    elem.click();
+    document.body.removeChild(elem);
 }
 
 
