@@ -166,20 +166,28 @@ form.role input {
 }
 
 .twocolumn > * {
+    display: inline-block;
+    box-sizing: border-box;
     width: 50%;
     text-align: center;
 }
 
 .twocolumn > :last-child {
-    margin-left: 1em;
+    text-align: right;
+    padding-right: 6px;
 }
 
 [name="used-value-slider"] {
     background-color: color-mix(in srgb, red, transparent);
+    color: color-mix(in srgb, black, transparent);;
     border-color: transparent;
+    box-sizing: border-box;
     border-radius: 8px;
     position: relative;
     z-index: 1;
+    font-size: 80%;
+    text-align: right;
+    padding: 3px 6px;
 }
 
 form.role input, .task, .add-task {

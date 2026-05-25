@@ -697,7 +697,8 @@ function updateRoles(...roleElems) {
             return (!period || task?.period === period) && (task?.roles?.[role.type] === roleId) ? task.value : 0;
         }));
         usedSliderElem.style.width = usedValueSliderWidth(usedValue, totalValue) + "%";
-        usedValueElem.textContent = displaySign(Math.round(usedValue - totalValue));
+        usedSliderElem.textContent = displaySign(Math.round(usedValue - totalValue));
+        usedValueElem.textContent = usedValue;
         const sizeElem = roleElem.elements["size"];
         if (sizeElem) {
             const size = !role.size ? null : period ? role.size[period] : sum(Object.values(role.size));
