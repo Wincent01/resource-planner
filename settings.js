@@ -6,15 +6,15 @@ var SETTINGS = {
         faculty: 850,
         postdoc: 340,
         phdstudent: 340,
-        amanuens: 80,
+        amanuens: 60,
         course: 500,
     },
     newTaskValue: {
         faculty: 340,
         postdoc: 100,
         phdstudent: 100,
-        amanuens: 80,
-        course: 80,
+        amanuens: 60,
+        course: 60,
         other: 40,
     },
     valueToWidth: {
