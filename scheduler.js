@@ -1,12 +1,194 @@
 
-window.addEventListener("DOMContentLoaded", initialise);
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Global state: server-side data & auth
 
-function initialise() {
+let CURRENT_DATASET_ID = null;
+let CURRENT_USER = null;
+let DATA_CACHE = { periods: [], roles: {}, tasks: {} };
+
+
+function apiCall(method, path, body, { silent = false } = {}) {
+    const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+    };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(path, opts).then(r => {
+        if (!r.ok) return r.json().then(d => { throw new Error(d.error || r.statusText); });
+        return r.json();
+    }).catch(err => {
+        console.error('API error:', err);
+        if (!silent) alert('Server error: ' + err.message);
+        throw err;
+    });
+}
+
+
+async function checkAuth() {
+    try {
+        const resp = await apiCall('GET', '/api/auth/me', undefined, { silent: true });
+        CURRENT_USER = resp.user;
+        return resp.user;
+    } catch {
+        return null;
+    }
+}
+
+
+function showLoginModal() {
+    const dialog = document.querySelector('#auth-dialog');
+    const loginTab = dialog.querySelector('#auth-login');
+    const registerTab = dialog.querySelector('#auth-register');
+    const errorElem = dialog.querySelector('.auth-error');
+    const form = dialog.querySelector('form');
+
+    // Reset state
+    loginTab.style.display = 'block';
+    registerTab.style.display = 'none';
+    errorElem.textContent = '';
+    form.reset();
+
+    // Tab switching
+    dialog.querySelectorAll('.auth-tabs button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const showLogin = btn.value === 'login';
+            loginTab.style.display = showLogin ? 'block' : 'none';
+            registerTab.style.display = showLogin ? 'none' : 'block';
+            errorElem.textContent = '';
+            dialog.querySelectorAll('.auth-tabs button').forEach(b => b.classList.toggle('active', b === btn));
+        });
+    });
+
+    dialog.showModal();
+
+    return new Promise((resolve) => {
+        function handleClose() {
+            if (dialog.returnValue === 'login-submit' || dialog.returnValue === 'register-submit') {
+                const isRegister = dialog.returnValue === 'register-submit';
+                const username = (isRegister
+                    ? form.elements['reg-username']?.value
+                    : form.elements['username'].value).trim();
+                const password = isRegister
+                    ? form.elements['reg-password']?.value
+                    : form.elements['password'].value;
+
+                if (!username || !password) {
+                    errorElem.textContent = 'All fields are required.';
+                    dialog.showModal();
+                    return;
+                }
+
+                if (isRegister) {
+                    const confirmPassword = form.elements['reg-confirm-password']?.value;
+                    if (password !== confirmPassword) {
+                        errorElem.textContent = 'Passwords do not match.';
+                        dialog.showModal();
+                        return;
+                    }
+                    if (password.length < 4) {
+                        errorElem.textContent = 'Password must be at least 4 characters.';
+                        dialog.showModal();
+                        return;
+                    }
+                }
+
+                const endpoint = isRegister ? 'register' : 'login';
+
+                apiCall('POST', '/api/auth/' + endpoint, { username, password })
+                    .then(resp => {
+                        CURRENT_USER = resp.user;
+                        dialog.removeEventListener('close', handleClose);
+                        dialog.close();
+                        resolve(resp.user);
+                    })
+                    .catch(err => {
+                        errorElem.textContent = err.message;
+                        dialog.showModal();
+                    });
+                return;
+            }
+            // If dialog was closed without submitting, open it again
+            if (!CURRENT_USER) {
+                dialog.showModal();
+            } else {
+                resolve(null);
+            }
+        }
+        dialog.addEventListener('close', handleClose);
+    });
+}
+
+
+function getDatasetIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('dataset') || null;
+}
+
+
+function setDatasetIdInUrl(datasetId) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('dataset', datasetId);
+    window.location.search = params.toString();
+}
+
+
+async function fetchDatasets() {
+    const resp = await apiCall('GET', '/api/datasets');
+    return resp.datasets || [];
+}
+
+
+async function loadDatasetData(datasetId) {
+    const data = await apiCall('GET', '/api/datasets/' + datasetId + '/data');
+    DATA_CACHE = data;
+}
+
+
+window.addEventListener("DOMContentLoaded", async () => {
+    // Ensure user is authenticated
+    if (!await checkAuth()) {
+        await showLoginModal();
+    }
+    if (!CURRENT_USER) window.location.reload();
+
+    // Load or create dataset
+    let datasetId = getDatasetIdFromUrl();
+    const datasets = await fetchDatasets();
+
+    if (datasetId) {
+        // Verify access
+        const found = datasets.find(d => d.id === parseInt(datasetId));
+        if (!found) datasetId = null;
+    }
+
+    if (!datasetId && datasets.length > 0) {
+        datasetId = String(datasets[0].id);
+    }
+
+    if (!datasetId) {
+        // No datasets — create one
+        const resp = await apiCall('POST', '/api/datasets', { name: 'My Schedule' });
+        datasetId = String(resp.dataset.id);
+        // Refresh dataset list so the selector shows the new dataset
+        const updated = await fetchDatasets();
+        datasets.length = 0;
+        datasets.push(...updated);
+    }
+
+    CURRENT_DATASET_ID = parseInt(datasetId);
+    await loadDatasetData(CURRENT_DATASET_ID);
+
+    // Now populate the page
+    setupDatasetSelector(datasets);
+    setupShareDialog();
+    setupLogoutButton();
     setupImportExport();
     setupAddRole();
     setupPeriods();
     selectPeriod();
-}
+});
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,12 +266,19 @@ function selectPeriod() {
 
 
 function setNewPeriod(period) {
-    window.location.search = period.replaceAll(" ", "+");
+    const params = new URLSearchParams(window.location.search);
+    if (period) {
+        params.set('period', period.replaceAll(" ", "+"));
+    } else {
+        params.delete('period');
+    }
+    window.location.search = params.toString();
 }
 
 
 function getCurrentPeriod() {
-    const period = window.location.search.replace(/^\?/, "").replaceAll("+", " ");
+    const params = new URLSearchParams(window.location.search);
+    const period = (params.get('period') || '').replaceAll("+", " ");
     return dbGetPeriods().includes(period) ? period : "";
 }
 
@@ -195,9 +384,9 @@ function exportJSON() {
 function importJSON() {
     const fileInput = document.querySelector("#import-json input");
     const fileReader = new FileReader();
-    fileReader.onload = (e) => {
+    fileReader.onload = async (e) => {
         const content = e.target.result;
-        dbReplaceAllData(JSON.parse(content));
+        await dbReplaceAllData(JSON.parse(content));
         window.location.reload();
     };
     fileReader.readAsText(fileInput.files[0]);
@@ -899,7 +1088,7 @@ function debounce(func) {
 
 
 function displaySign(number) {
-    return (number > 0 ? "+" : number < 0 ? "–" : "±") + Math.abs(number);
+    return (number > 0 ? "+" : number < 0 ? "-" : "±") + Math.abs(number);
 }
 
 
@@ -930,108 +1119,221 @@ function usedValueSliderWidth(usedValue, totalValue) {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// Database
+// Database (synchronous cache backed by async API)
 
 function dbClearDatabase() {
-    localStorage.clear();
+    DATA_CACHE = { periods: [], roles: {}, tasks: {} };
+    if (CURRENT_DATASET_ID)
+        apiCall('PUT', '/api/datasets/' + CURRENT_DATASET_ID + '/data', DATA_CACHE);
 }
 
 function dbReplaceAllData(data) {
-    dbClearDatabase();
-    dbSetPeriods(data.periods);
-    for (const roleId in data.roles) dbUpdateRole(roleId, data.roles[roleId]);
-    for (const taskId in data.tasks) dbUpdateTask(taskId, data.tasks[taskId]);
+    DATA_CACHE = JSON.parse(JSON.stringify(data));  // deep clone
+    if (CURRENT_DATASET_ID)
+        return apiCall('PUT', '/api/datasets/' + CURRENT_DATASET_ID + '/data', DATA_CACHE);
+    return Promise.resolve();
 }
 
 function dbGetAllData() {
-    const data = {roles: {}, tasks: {}};
-    data.periods = dbGetPeriods();
-    for (const roleId of dbRoleIds()) data.roles[roleId] = dbGetRole(roleId);
-    for (const taskId of dbTaskIds()) data.tasks[taskId] = dbGetTask(taskId);
-    return data;
+    return JSON.parse(JSON.stringify(DATA_CACHE));  // deep clone
 }
 
 function dbGetPeriods() {
-    const jsonPeriods = localStorage.getItem("periods");
-    return jsonPeriods && JSON.parse(jsonPeriods);
+    return DATA_CACHE.periods || [];
 }
 
 function dbSetPeriods(periods) {
-    localStorage.setItem("periods", JSON.stringify(periods));
+    DATA_CACHE.periods = periods;
+    if (CURRENT_DATASET_ID)
+        apiCall('PUT', '/api/datasets/' + CURRENT_DATASET_ID + '/periods', { periods });
 }
 
 function dbInsertPeriod(period) {
-    const periods = dbGetPeriods();
+    const periods = DATA_CACHE.periods || [];
     if (periods.includes(period)) return;
     periods.splice(0, 0, period);
-    localStorage.setItem("periods", JSON.stringify(periods));
+    DATA_CACHE.periods = periods;
+    if (CURRENT_DATASET_ID)
+        apiCall('POST', '/api/datasets/' + CURRENT_DATASET_ID + '/periods', { name: period });
 }
 
 function dbDeletePeriod(period) {
-    const periods = dbGetPeriods();
+    const periods = DATA_CACHE.periods || [];
     const i = periods.indexOf(period);
     if (i < 0) return;
     periods.splice(i, 1);
-    localStorage.setItem("periods", JSON.stringify(periods));
+    DATA_CACHE.periods = periods;
+    if (CURRENT_DATASET_ID)
+        apiCall('DELETE', '/api/datasets/' + CURRENT_DATASET_ID + '/periods/' + encodeURIComponent(period));
 }
 
 function dbRoleIds() {
-    const roleIds = [];
-    for (let i = 0; i < localStorage.length; i++){
-        let id = localStorage.key(i);
-        if (id[0] === "#") {
-            id = id.slice(1);
-            roleIds.push([id, dbGetRole(id).name]);
-        }
-    }
-    return roleIds.toSorted((a,b) => a[1].localeCompare(b[1])).map((a) => a[0]);
+    const roles = DATA_CACHE.roles || {};
+    const entries = Object.entries(roles).map(([id, role]) => [id, role.name]);
+    return entries.toSorted((a, b) => a[1].localeCompare(b[1])).map(a => a[0]);
 }
 
 function dbHasRole(roleId) {
-    return dbGetRole(roleId);
+    return (DATA_CACHE.roles || {})[roleId] !== undefined;
 }
 
 function dbGetRole(roleId) {
-    const jsonRole = localStorage.getItem("#" + roleId);
-    return jsonRole && JSON.parse(jsonRole);
+    return (DATA_CACHE.roles || {})[roleId] || null;
 }
 
 function dbUpdateRole(roleId, role) {
-    localStorage.setItem("#" + roleId, JSON.stringify(role));
+    if (!DATA_CACHE.roles) DATA_CACHE.roles = {};
+    DATA_CACHE.roles[roleId] = role;
+    if (CURRENT_DATASET_ID)
+        apiCall('PUT', '/api/datasets/' + CURRENT_DATASET_ID + '/roles/' + encodeURIComponent(roleId), role);
 }
 
 function dbDeleteRole(roleId) {
-    localStorage.removeItem("#" + roleId);
+    delete (DATA_CACHE.roles || {})[roleId];
+    if (CURRENT_DATASET_ID)
+        apiCall('DELETE', '/api/datasets/' + CURRENT_DATASET_ID + '/roles/' + encodeURIComponent(roleId));
 }
 
 function dbTaskIds() {
-    const taskIds = [];
-    for (let i = 0; i < localStorage.length; i++){
-        const id = localStorage.key(i);
-        if (id[0] === ":") taskIds.push(parseInt(id.slice(1)));
-    }
-    return taskIds.toSorted((a,b) => a - b);
+    const tasks = DATA_CACHE.tasks || {};
+    return Object.keys(tasks).map(Number).toSorted((a, b) => a - b);
 }
 
 function dbCreateTask(task) {
-    const taskId = Math.max(0, ...dbTaskIds()) + 1;
-    dbUpdateTask(taskId, task);
+    if (!DATA_CACHE.tasks) DATA_CACHE.tasks = {};
+    const taskId = Math.max(0, ...Object.keys(DATA_CACHE.tasks).map(Number)) + 1;
+    DATA_CACHE.tasks[String(taskId)] = task;
+    if (CURRENT_DATASET_ID)
+        apiCall('POST', '/api/datasets/' + CURRENT_DATASET_ID + '/tasks', task).then(resp => {
+            // API returns the server-assigned ID; ensure consistency
+            if (resp && resp.id && resp.id !== taskId) {
+                delete DATA_CACHE.tasks[String(taskId)];
+                DATA_CACHE.tasks[String(resp.id)] = task;
+            }
+        });
     return taskId;
 }
 
 function dbHasTask(taskId) {
-    return dbGetTask(taskId);
+    return (DATA_CACHE.tasks || {})[String(taskId)] !== undefined;
 }
 
 function dbGetTask(taskId) {
-    const jsonTask = localStorage.getItem(":" + taskId);
-    return jsonTask && JSON.parse(jsonTask);
+    return (DATA_CACHE.tasks || {})[String(taskId)] || null;
 }
 
 function dbUpdateTask(taskId, task) {
-    localStorage.setItem(":" + taskId, JSON.stringify(task));
+    if (!DATA_CACHE.tasks) DATA_CACHE.tasks = {};
+    DATA_CACHE.tasks[String(taskId)] = task;
+    if (CURRENT_DATASET_ID)
+        apiCall('PUT', '/api/datasets/' + CURRENT_DATASET_ID + '/tasks/' + taskId, task);
 }
 
 function dbDeleteTask(taskId) {
-    localStorage.removeItem(":" + taskId);
+    delete (DATA_CACHE.tasks || {})[String(taskId)];
+    if (CURRENT_DATASET_ID)
+        apiCall('DELETE', '/api/datasets/' + CURRENT_DATASET_ID + '/tasks/' + taskId);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Dataset selector, sharing, logout
+
+function setupDatasetSelector(datasets) {
+    const sel = document.querySelector('#dataset-select');
+    if (!sel) return;
+    sel.replaceChildren();
+    for (const ds of datasets) {
+        sel.appendChild(newElem('option', ds.name, { value: ds.id }));
+    }
+    sel.appendChild(newElem('option', '------------', { value: '%', disabled: true }));
+    sel.appendChild(newElem('option', 'Create new dataset', { value: '+' }));
+    if (CURRENT_DATASET_ID) {
+        sel.appendChild(newElem('option', 'Delete this dataset', { value: '-' }));
+    }
+    sel.value = String(CURRENT_DATASET_ID);
+
+    sel.addEventListener('change', () => {
+        if (sel.value === '+') {
+            const name = prompt('Name of the new dataset?');
+            if (name) {
+                apiCall('POST', '/api/datasets', { name }).then(resp => {
+                    setDatasetIdInUrl(resp.dataset.id);
+                });
+            } else {
+                sel.value = String(CURRENT_DATASET_ID);
+            }
+        } else if (sel.value === '-') {
+            if (confirm('Are you sure you want to delete this dataset? This cannot be undone.')) {
+                apiCall('DELETE', '/api/datasets/' + CURRENT_DATASET_ID).then(() => {
+                    window.location.search = '';
+                }).catch(() => {
+                    alert('Cannot delete dataset.');
+                    sel.value = String(CURRENT_DATASET_ID);
+                });
+            } else {
+                sel.value = String(CURRENT_DATASET_ID);
+            }
+        } else {
+            setDatasetIdInUrl(sel.value);
+        }
+    });
+}
+
+
+function setupShareDialog() {
+    const shareBtn = document.querySelector('#share-btn');
+    if (!shareBtn) return;
+    shareBtn.addEventListener('click', async () => {
+        const dialog = document.querySelector('#share-dialog');
+        const list = dialog.querySelector('#share-users-list');
+        const form = dialog.querySelector('form');
+        const errorElem = dialog.querySelector('.share-error');
+
+        // Refresh user list
+        try {
+            const resp = await apiCall('GET', '/api/datasets/' + CURRENT_DATASET_ID + '/users');
+            list.replaceChildren();
+            for (const u of resp.users) {
+                const li = newElem('li', u.username + ' (' + u.permission + ')');
+                if (u.id !== CURRENT_USER.id) {
+                    li.appendChild(newElem('button', 'Remove', { class: 'remove-user-btn' }));
+                    li.querySelector('button').addEventListener('click', async () => {
+                        await apiCall('DELETE', '/api/datasets/' + CURRENT_DATASET_ID + '/users/' + u.id);
+                        li.remove();
+                    });
+                }
+                list.appendChild(li);
+            }
+        } catch { return; }
+
+        errorElem.textContent = '';
+        form.reset();
+        dialog.showModal();
+
+        dialog.addEventListener('close', async function handler() {
+            dialog.removeEventListener('close', handler);
+            if (dialog.returnValue === 'share-submit') {
+                const username = form.elements['username'].value.trim();
+                const permission = form.elements['permission'].value;
+                if (!username) return;
+                try {
+                    await apiCall('POST', '/api/datasets/' + CURRENT_DATASET_ID + '/share', { username, permission });
+                } catch (err) {
+                    errorElem.textContent = err.message;
+                }
+            }
+        }, { once: true });
+    });
+}
+
+
+function setupLogoutButton() {
+    const btn = document.querySelector('#logout-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        await apiCall('POST', '/api/auth/logout');
+        CURRENT_USER = null;
+        window.location.reload();
+    });
 }

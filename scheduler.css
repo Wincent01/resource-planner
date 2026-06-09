@@ -282,3 +282,188 @@ header > div > * {
 .edit-dialog .buttons :last-child {
     float: right;
 }
+
+.auth-dialog {
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 320px;
+}
+
+.auth-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #ccc;
+}
+
+.auth-tabs button {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+    color: #666;
+    border-bottom: 3px solid transparent;
+}
+
+.auth-tabs button.active {
+    color: #333;
+    border-bottom-color: royalblue;
+}
+
+.auth-dialog h4 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+}
+
+.auth-dialog label {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.auth-dialog input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.auth-dialog input:focus {
+    outline: none;
+    border-color: royalblue;
+    box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.2);
+}
+
+.auth-error, .share-error {
+    display: block;
+    color: #d00;
+    font-size: 13px;
+    margin: 8px 0;
+    min-height: 18px;
+}
+
+.auth-dialog .buttons {
+    margin-top: 12px;
+}
+
+.auth-dialog .buttons button {
+    width: 100%;
+    padding: 10px;
+    background: royalblue;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.auth-dialog .buttons button:hover {
+    background: #2a4fa0;
+}
+
+.share-dialog {
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 360px;
+    max-width: 480px;
+}
+
+.share-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.share-dialog h4 {
+    margin: 0 0 12px 0;
+}
+
+.share-dialog h5 {
+    margin: 12px 0 4px 0;
+}
+
+.share-dialog label {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.share-dialog input[type="text"] {
+    width: 200px;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.share-dialog select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.share-dialog button {
+    padding: 6px 14px;
+    border: 1px solid #999;
+    border-radius: 4px;
+    background: #f5f5f5;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.share-dialog button:hover {
+    background: #e5e5e5;
+}
+
+#share-users-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+}
+
+#share-users-list li {
+    padding: 4px 8px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.remove-user-btn {
+    color: #d00;
+    border: 1px solid #d00 !important;
+    padding: 2px 10px !important;
+}
+
+#dataset-select {
+    padding: 4px 8px;
+    border: 1px solid #999;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+}
+
+#logout-btn {
+    padding: 4px 12px;
+    border: 1px solid #999;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    background: #f5f5f5;
+}
+
+#logout-btn:hover {
+    background: #fee;
+    border-color: #c00;
+}
+
+header #share-span,
+header #logout-span {
+    margin-left: 16px;
+}

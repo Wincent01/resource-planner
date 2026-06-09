@@ -14,6 +14,7 @@
   <div>
     <h1><span id="current-period"></span></h1>
     <div id="select-period"><select name="select-period"></select></div>
+    <div><select id="dataset-select"></select></div>
     <div>
       <select class="add-role" data-type="person">
         <option selected disabled>Add person</option>
@@ -39,6 +40,8 @@
       <span id="import-json"><button>Import from JSON</button><input type="file" accept=".json"/></span>
       <span id="export-json"><button>Export to JSON</button></span>
       <span id="export-csv"><button>Export to CSV</button></span>
+      <span id="share-span"><button id="share-btn">Share</button></span>
+      <span id="logout-span"><button id="logout-btn">Logout</button></span>
     </div>
   </div>
 </header>
@@ -288,6 +291,60 @@
   <form>
     <div class="role-info-content"></div>
     <button class="role-info-close" formmethod="dialog">Close</button>
+  </form>
+</dialog>
+
+
+<dialog id="auth-dialog" class="auth-dialog">
+  <form method="dialog" novalidate>
+    <div class="auth-tabs">
+      <button value="login" class="active" type="button">Login</button>
+      <button value="register" type="button">Register</button>
+    </div>
+    <div id="auth-login">
+      <h4>Login</h4>
+      <label><input name="username" type="text" placeholder="Username" required/></label>
+      <label><input name="password" type="password" placeholder="Password" required/></label>
+      <span class="auth-error"></span>
+      <div class="buttons">
+        <button value="login-submit">Login</button>
+      </div>
+    </div>
+    <div id="auth-register" style="display:none">
+      <h4>Register</h4>
+      <label><input name="reg-username" type="text" placeholder="Username" required/></label>
+      <label><input name="reg-password" type="password" placeholder="Password (min 4 chars)" required/></label>
+      <label><input name="reg-confirm-password" type="password" placeholder="Confirm password" required/></label>
+      <span class="auth-error"></span>
+      <div class="buttons">
+        <button value="register-submit">Register</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+
+<dialog id="share-dialog" class="share-dialog">
+  <form method="dialog">
+    <h4>Share dataset</h4>
+    <div>
+      <label>Username: <input name="username" type="text" placeholder="User to share with"/></label>
+      <label>Permission:
+        <select name="permission">
+          <option value="write">Can edit</option>
+          <option value="read">Can view</option>
+          <option value="admin">Admin</option>
+        </select>
+      </label>
+      <button value="share-submit">Share</button>
+      <span class="share-error"></span>
+    </div>
+    <hr/>
+    <h5>Current collaborators</h5>
+    <ul id="share-users-list"></ul>
+    <div class="buttons">
+      <button formmethod="dialog" value="cancel">Close</button>
+    </div>
   </form>
 </dialog>
 

@@ -2,4 +2,5 @@
 # Private files/directories
 
 _*
+*.db
 
